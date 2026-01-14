@@ -20,7 +20,7 @@ export const useAuthStore = defineStore('auth', {
             this.isLoading = true;
             this.error = null;
             try {
-                await axios.get('/sanctum/csrf-cookie');
+                await axios.get(`${import.meta.env.VITE_API_URL}/sanctum/csrf-cookie`);
                 const response = await api.post('/register', userData);
 
                 this.token = response.data.token;
@@ -40,7 +40,7 @@ export const useAuthStore = defineStore('auth', {
             this.isLoading = true;
             this.error = null;
             try {
-                await axios.get('/sanctum/csrf-cookie');
+                await axios.get(`${import.meta.env.VITE_API_URL}/sanctum/csrf-cookie`);
                 const response = await api.post('/login', credentials);
 
                 this.token = response.data.token;
