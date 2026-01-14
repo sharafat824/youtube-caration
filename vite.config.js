@@ -20,12 +20,12 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: env.VITE_API_URL,
         changeOrigin: true,
         secure: false,
       },
       '/sanctum': {
-        target: 'http://localhost:8000',
+        target: env.VITE_API_URL,
         changeOrigin: true,
         secure: false,
       },
