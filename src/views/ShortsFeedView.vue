@@ -1,11 +1,13 @@
 <script setup>
 import { onMounted, ref, watch, nextTick } from 'vue';
 import { useShortsStore } from '@/stores/shorts';
+import { useSubscriptionStore } from '@/stores/subscriptions';
 import { useRoute } from 'vue-router';
 import ShortCard from '@/components/shorts/ShortCard.vue';
 import Loader from '@/components/ui/Loader.vue';
 
 const shortsStore = useShortsStore();
+const subStore = useSubscriptionStore();
 const route = useRoute();
 
 const feedContainer = ref(null);
@@ -74,6 +76,7 @@ watch(() => route.query, async (newQuery) => {
 }, { deep: true });
 
 onMounted(async () => {
+    subStore.fetchSubscriptions(); // don't need to await this for the view to render
     await loadShorts();
 });
 </script>
