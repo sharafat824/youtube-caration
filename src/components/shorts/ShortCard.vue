@@ -20,19 +20,26 @@ const shortsStore = useShortsStore();
 
 const toggleFavorite = async () => {
   if (!authStore.isAuthenticated) {
-    // Ideally prompt login
     alert('Please login to favorite shorts');
     return;
   }
-  await shortsStore.toggleFavorite(props.short.id);
+  await shortsStore.toggleFavorite(props.short.youtube_video_id);
 };
+
+const toggleMute = () => {
+  shortsStore.setMuted(!shortsStore.isMuted);
+};
+
+const channelInitial = computed(() => {
+    return props.short.channel_title ? props.short.channel_title.charAt(0) : '?';
+});
 </script>
 
 <template>
   <div class="relative w-full h-full snap-start shrink-0 bg-black flex flex-col justify-center">
     
-    <!-- Video Player -->
-    <div class="absolute inset-0 z-0">
+    <!-- Video Player & Interaction Area -->
+    <div class="absolute inset-0 z-0" @click="toggleMute">
       <ShortPlayer 
         :video-id="short.youtube_video_id" 
         :should-play="isActive"
@@ -40,16 +47,16 @@ const toggleFavorite = async () => {
     </div>
 
     <!-- Overlay Info -->
-    <div class="absolute bottom-0 left-0 right-0 z-10 p-4 bg-gradient-to-t from-black/80 to-transparent pt-20">
+    <div class="absolute bottom-0 left-0 right-0 z-10 p-4 bg-gradient-to-t from-black/80 to-transparent pt-20 pointer-events-none">
       
-      <div class="flex items-end justify-between">
+      <div class="flex items-end justify-between pointer-events-auto">
         <div class="flex-1 mr-4">
             <div class="flex items-center space-x-2 mb-2">
                 <div class="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center text-xs font-bold text-white uppercase">
-                    {{ short.youtube_channel_name.charAt(0) }}
+                    {{ channelInitial }}
                 </div>
                 <span class="text-white font-semibold text-sm drop-shadow-md">
-                    {{ short.youtube_channel_name }}
+                    {{ short.channel_title }}
                 </span>
             </div>
           
@@ -57,9 +64,10 @@ const toggleFavorite = async () => {
                 {{ short.title }}
             </h3>
 
+            <!-- Tags (could be parsed from description if needed, or just #hashtag) -->
             <div class="flex flex-wrap gap-2">
-                <span v-if="short.category" class="px-2 py-1 bg-white/20 backdrop-blur-sm rounded-md text-xs text-white">
-                    {{ short.category.name }}
+                <span class="px-2 py-1 bg-white/20 backdrop-blur-sm rounded-md text-xs text-white">
+                    #YouTubeShorts
                 </span>
             </div>
         </div>
@@ -68,13 +76,27 @@ const toggleFavorite = async () => {
         <div class="flex flex-col items-center space-y-6 pb-2">
           
           <!-- Favorite Button -->
-          <button @click="toggleFavorite" class="flex flex-col items-center group">
+          <button @click.stop="toggleFavorite" class="flex flex-col items-center group">
             <div class="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center transition-transform active:scale-90">
                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 transition-colors" :class="short.is_favorited ? 'text-red-500 fill-red-500' : 'text-white'" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                 </svg>
             </div>
             <span class="text-xs text-white mt-1 shadow-black drop-shadow-md">Fav</span>
+          </button>
+
+          <!-- Audio Toggle -->
+          <button @click.stop="toggleMute" class="flex flex-col items-center group">
+            <div class="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center transition-transform active:scale-90">
+                <svg v-if="shortsStore.isMuted" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                </svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5z" />
+                </svg>
+            </div>
+            <span class="text-xs text-white mt-1 shadow-black drop-shadow-md">{{ shortsStore.isMuted ? 'Unmute' : 'Mute' }}</span>
           </button>
 
           <!-- Share Button (Dummy) -->

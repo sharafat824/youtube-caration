@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia';
 import api from '@/axios';
-import axios from 'axios';
 
 export const useAuthStore = defineStore('auth', {
     state: () => ({
@@ -20,11 +19,14 @@ export const useAuthStore = defineStore('auth', {
             this.isLoading = true;
             this.error = null;
             try {
-                await axios.get(`${import.meta.env.VITE_API_URL}/sanctum/csrf-cookie`);
                 const response = await api.post('/register', userData);
 
-                this.token = response.data.token;
-                this.user = response.data.user;
+                // response.data is the full Axios response body
+                // response.data.data contains { id, name, email, role, token }
+                const { token, ...userDetails } = response.data.data;
+
+                this.token = token;
+                this.user = userDetails;
 
                 localStorage.setItem('token', this.token);
                 return true;
@@ -40,11 +42,12 @@ export const useAuthStore = defineStore('auth', {
             this.isLoading = true;
             this.error = null;
             try {
-                await axios.get(`${import.meta.env.VITE_API_URL}/sanctum/csrf-cookie`);
                 const response = await api.post('/login', credentials);
 
-                this.token = response.data.token;
-                this.user = response.data.user;
+                const { token, ...userDetails } = response.data.data;
+
+                this.token = token;
+                this.user = userDetails;
 
                 localStorage.setItem('token', this.token);
                 return true;
@@ -57,24 +60,23 @@ export const useAuthStore = defineStore('auth', {
         },
 
         async logout() {
-            try {
-                await api.post('/logout');
-            } catch (err) {
-                console.error('Logout error', err);
-            } finally {
-                this.token = null;
-                this.user = null;
-                localStorage.removeItem('token');
-            }
+            // In JWT stateless auth, logout is primarily local
+            this.token = null;
+            this.user = null;
+            localStorage.removeItem('token');
+
+            // Optional: call backend if we had a token blacklist, 
+            // but for simple setup, clearing local state is enough.
         },
 
         async fetchUser() {
             if (!this.token) return;
             try {
                 const response = await api.get('/user');
-                this.user = response.data.user;
+                this.user = response.data.data;
             } catch (err) {
                 this.token = null;
+                this.user = null;
                 localStorage.removeItem('token');
             }
         }

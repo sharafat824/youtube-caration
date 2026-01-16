@@ -1,5 +1,6 @@
 <script setup>
 import { onMounted, ref, watch, onUnmounted } from 'vue';
+import { useShortsStore } from '@/stores/shorts';
 
 const props = defineProps({
   videoId: {
@@ -8,92 +9,132 @@ const props = defineProps({
   },
   shouldPlay: {
     type: Boolean,
-    default: true, // default true for autoplay
+    default: false,
   },
 });
 
+const shortsStore = useShortsStore();
 const playerContainer = ref(null);
 const iframeId = `youtube-player-${props.videoId}`;
 let player = null;
+const isLoading = ref(true);
 
-const isLoading = ref(true); // Spinner state
+// Global Promise for YouTube API loading to avoid race conditions
+const getYT = (() => {
+  let ytPromise = null;
+  return () => {
+    if (ytPromise) return ytPromise;
+    
+    ytPromise = new Promise((resolve) => {
+      if (window.YT && typeof window.YT.Player === 'function') {
+        resolve(window.YT);
+        return;
+      }
 
-const loadYouTubeAPI = () => {
-  return new Promise((resolve) => {
-    if (window.YT && window.YT.Player) {
-      resolve(window.YT);
+      // Check if tag already exists
+      if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
+        const tag = document.createElement('script');
+        tag.src = 'https://www.youtube.com/iframe_api';
+        const firstScriptTag = document.getElementsByTagName('script')[0];
+        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+      }
+
+      // Instead of overwriting window.onYouTubeIframeAPIReady,
+      // we check periodically if the API is ready
+      const checkReady = setInterval(() => {
+        if (window.YT && typeof window.YT.Player === 'function') {
+          clearInterval(checkReady);
+          resolve(window.YT);
+        }
+      }, 100);
+    });
+    return ytPromise;
+  };
+})();
+
+const syncMuteState = () => {
+  if (player && typeof player.mute === 'function') {
+    if (shortsStore.isMuted) {
+      player.mute();
     } else {
-      const tag = document.createElement('script');
-      tag.src = 'https://www.youtube.com/iframe_api';
-      const firstScriptTag = document.getElementsByTagName('script')[0];
-      firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-      window.onYouTubeIframeAPIReady = () => resolve(window.YT);
+      player.unMute();
     }
-  });
-};
-
-const initPlayer = async () => {
-  const YT = await loadYouTubeAPI();
-  
-  if (player) return;
-
-  player = new YT.Player(iframeId, {
-    videoId: props.videoId,
-    playerVars: {
-      autoplay: 1, // Auto-play enabled
-      controls: 1,
-      rel: 0,
-      modestbranding: 1,
-      playsinline: 1,
-      fs: 0,
-      iv_load_policy: 3,
-      disablekb: 1,
-    },
-    events: {
-      onReady: onPlayerReady,
-      onStateChange: onPlayerStateChange,
-    },
-  });
-};
-
-const onPlayerReady = (event) => {
-  if (props.shouldPlay) {
-    event.target.playVideo();
   }
 };
 
-const onPlayerStateChange = (event) => {
-  // YouTube Player States
-  // -1 = unstarted
-  // 0 = ended
-  // 1 = playing
-  // 2 = paused
-  // 3 = buffering
-  // 5 = video cued
+const initPlayer = async () => {
+  try {
+    // Only init if we should play or if we want to pre-load (could add pre-load logic later)
+    if (!props.shouldPlay) return;
 
-  if (event.data === 1) {
-    isLoading.value = false; // Playing, hide spinner
-  } else if (event.data === 3) {
-    isLoading.value = true; // Buffering, show spinner
+    const YT = await getYT();
+    
+    if (player || !playerContainer.value) return;
+
+    player = new YT.Player(iframeId, {
+      videoId: props.videoId,
+      playerVars: {
+        autoplay: 1,
+        controls: 0, 
+        rel: 0,
+        modestbranding: 1,
+        playsinline: 1,
+        fs: 0,
+        iv_load_policy: 3,
+        disablekb: 1,
+        origin: window.location.origin
+      },
+      events: {
+        onReady: (event) => {
+          isLoading.value = false;
+          // Sync with store state
+          syncMuteState();
+          event.target.playVideo();
+        },
+        onStateChange: (event) => {
+          if (event.data === 1) { // Playing
+            isLoading.value = false;
+          } else if (event.data === 3) { // Buffering
+            isLoading.value = true;
+          } else if (event.data === 0) { // Ended (loop it)
+            event.target.playVideo();
+          }
+        },
+      },
+    });
+  } catch (err) {
+    console.error('Failed to init YT player', err);
+    isLoading.value = false;
   }
 };
 
 watch(() => props.shouldPlay, (newVal) => {
-  if (player && player.playVideo) {
-    if (newVal) {
+  if (newVal) {
+    if (!player) {
+      initPlayer();
+    } else if (typeof player.playVideo === 'function') {
+      syncMuteState();
       player.playVideo();
-    } else {
+    }
+  } else {
+    if (player && typeof player.pauseVideo === 'function') {
       player.pauseVideo();
     }
   }
 });
 
+watch(() => shortsStore.isMuted, () => {
+    syncMuteState();
+});
+
 onMounted(() => {
-  initPlayer();
+  if (props.shouldPlay) {
+    initPlayer();
+  }
 });
 
 onUnmounted(() => {
-  if (player && player.destroy) {
+  if (player && typeof player.destroy === 'function') {
     player.destroy();
   }
 });
@@ -101,21 +142,31 @@ onUnmounted(() => {
 
 <template>
   <div class="w-full h-full bg-black relative flex items-center justify-center overflow-hidden" ref="playerContainer">
-    <!-- Loader -->
-    <div v-if="isLoading" class="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
-      <div class="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+    <!-- Loader & Thumbnail Placeholder -->
+    <div v-if="isLoading || !player" class="absolute inset-0 flex items-center justify-center bg-black z-20">
+      <!-- Thumbnail while loading -->
+      <img 
+        :src="`https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`" 
+        class="absolute inset-0 w-full h-full object-cover blur-sm opacity-50"
+        alt=""
+      />
+      <div class="z-30 w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin"></div>
     </div>
 
-    <!-- YouTube iframe -->
-    <div :id="iframeId" class="w-full h-full absolute inset-0 pointer-events-auto"></div>
+    <!-- YouTube iframe wrapper -->
+    <!-- pointer-events-none helps prevent clicks from showing YT standard UI -->
+    <div class="w-full h-full absolute inset-0 pointer-events-none scale-110">
+      <div :id="iframeId"></div>
+    </div>
   </div>
 </template>
 
 <style scoped>
-/* Ensure the iframe covers the container */
 :deep(iframe) {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  position: absolute;
+  top: 0;
+  left: 0;
 }
 </style>

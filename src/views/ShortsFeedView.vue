@@ -23,8 +23,8 @@ const setupObserver = () => {
                 const index = parseInt(entry.target.dataset.index);
                 activeShortIndex.value = index;
                 
-                // Infinite scroll trigger when nearing end
-                if (index >= shortsStore.shorts.length - 2 && shortsStore.hasMore && !shortsStore.isLoading) {
+                // Load more if we're near the end (e.g., 3 items from bottom)
+                if (index >= shortsStore.shorts.length - 3 && !shortsStore.isLoading && shortsStore.nextPageToken) {
                     loadMore();
                 }
             }
@@ -40,27 +40,41 @@ const setupObserver = () => {
     });
 };
 
-const loadMore = async () => {
-    const category = route.query.category || null;
-    await shortsStore.fetchShorts(category);
-    // Re-attach observer for new items
+const loadShorts = async (refresh = false) => {
+    const filters = {
+        hashtag: route.query.hashtag || null,
+        channelId: route.query.channelId || null
+    };
+    
+    await shortsStore.fetchShorts(filters, refresh);
+    
     nextTick(() => {
-        const cards = document.querySelectorAll('.short-card');
-        cards.forEach((card) => observer.observe(card));
+        setupObserver();
     });
 };
 
-// Watch for category changes in URL
-watch(() => route.query.category, async (newCategory) => {
+const loadMore = async () => {
+    const filters = {
+        hashtag: route.query.hashtag || null,
+        channelId: route.query.channelId || null
+    };
+    
+    await shortsStore.fetchShorts(filters, false);
+    
+    nextTick(() => {
+        setupObserver();
+    });
+};
+
+// Watch for any filter changes in URL
+watch(() => route.query, async (newQuery) => {
     activeShortIndex.value = 0;
     if(feedContainer.value) feedContainer.value.scrollTop = 0;
-    await shortsStore.fetchShorts(newCategory, true); // true = refresh
-    setupObserver();
-});
+    await loadShorts(true);
+}, { deep: true });
 
 onMounted(async () => {
-    await shortsStore.fetchShorts(route.query.category);
-    setupObserver();
+    await loadShorts();
 });
 </script>
 
@@ -70,17 +84,36 @@ onMounted(async () => {
         class="h-screen w-full overflow-y-scroll snap-y snap-mandatory bg-black pb-16 scroll-smooth no-scrollbar"
     >
         <div v-if="shortsStore.isLoading && shortsStore.shorts.length === 0" class="flex h-full items-center justify-center">
-            <Loader />
+            <div class="text-center">
+                <Loader />
+                <p class="mt-4 text-gray-400">Fetching shorts from YouTube...</p>
+            </div>
+        </div>
+
+        <div v-else-if="shortsStore.error" class="flex h-full items-center justify-center text-red-400">
+            <div class="text-center p-6">
+                <p class="text-lg font-bold">Error</p>
+                <p class="mt-2 text-sm">{{ shortsStore.error }}</p>
+                <button @click="loadShorts(true)" class="mt-4 bg-gray-800 px-4 py-2 rounded text-white">Try again</button>
+            </div>
         </div>
 
         <div v-else-if="shortsStore.shorts.length === 0" class="flex h-full items-center justify-center text-gray-500">
-            No shorts found.
+            <div class="text-center p-6">
+                <div class="w-16 h-16 bg-gray-900 rounded-full flex items-center justify-center mx-auto mb-4">
+                     <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                </div>
+                <p>No shorts found here.</p>
+                <button @click="loadShorts(true)" class="mt-4 text-blue-400">Try again</button>
+            </div>
         </div>
 
         <template v-else>
             <div 
                 v-for="(short, index) in shortsStore.shorts" 
-                :key="short.id"
+                :key="short.youtube_video_id"
                 :data-index="index"
                 class="short-card h-full w-full snap-start relative"
             >
@@ -90,7 +123,6 @@ onMounted(async () => {
                 />
             </div>
             
-             <!-- Bottom Loader for Infinite Scroll -->
             <div v-if="shortsStore.isLoading && shortsStore.shorts.length > 0" class="h-20 flex items-center justify-center snap-end">
                 <Loader />
             </div>

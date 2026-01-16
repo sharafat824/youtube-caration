@@ -1,12 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import ShortsFeedView from '../views/ShortsFeedView.vue'
-import CategoriesView from '../views/CategoriesView.vue'
+import HashtagsView from '../views/HashtagsView.vue'
 import FavoritesView from '../views/FavoritesView.vue'
 import LoginView from '../views/LoginView.vue'
 import AdminLayout from '@/components/layouts/AdminLayout.vue'
-import AdminShortsView from '@/views/admin/AdminShortsView.vue'
-import AdminCategoriesView from '@/views/admin/AdminCategoriesView.vue'
+import AdminHashtagsView from '@/views/admin/AdminHashtagsView.vue'
+import AdminChannelsView from '@/views/admin/AdminChannelsView.vue'
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
@@ -17,9 +17,9 @@ const router = createRouter({
             component: ShortsFeedView
         },
         {
-            path: '/categories',
-            name: 'categories',
-            component: CategoriesView
+            path: '/discover',
+            name: 'discover',
+            component: HashtagsView
         },
         {
             path: '/favorites',
@@ -40,17 +40,17 @@ const router = createRouter({
             children: [
                 {
                     path: '',
-                    redirect: '/admin/shorts'
+                    redirect: '/admin/hashtags'
                 },
                 {
-                    path: 'shorts',
-                    name: 'admin-shorts',
-                    component: AdminShortsView
+                    path: 'hashtags',
+                    name: 'admin-hashtags',
+                    component: AdminHashtagsView
                 },
                 {
-                    path: 'categories',
-                    name: 'admin-categories',
-                    component: AdminCategoriesView
+                    path: 'channels',
+                    name: 'admin-channels',
+                    component: AdminChannelsView
                 }
             ]
         }
@@ -70,7 +70,7 @@ router.beforeEach(async (to, from, next) => {
     } else if (to.meta.requiresAdmin && !authStore.isAdmin) {
         next('/')
     } else if (to.meta.guestOnly && authStore.isAuthenticated) {
-        next('/favorites') // Redirect to profile/favorites if already logged in
+        next('/favorites')
     } else {
         next()
     }

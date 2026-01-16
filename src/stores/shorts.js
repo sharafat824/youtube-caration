@@ -4,63 +4,67 @@ import api from '@/axios';
 export const useShortsStore = defineStore('shorts', {
     state: () => ({
         shorts: [],
-        nextCursor: null,
         isLoading: false,
         error: null,
-        hasMore: true,
-        currentCategory: null,
+        currentHashtag: null,
+        currentChannelId: null,
+        nextPageToken: null,
+        isMuted: true,
     }),
 
     actions: {
-        async fetchShorts(categorySlug = null, refresh = false) {
+        setMuted(muted) {
+            this.isMuted = muted;
+        },
+        async fetchShorts(filters = {}, refresh = false) {
+            const { hashtag, channelId } = filters;
+
             if (refresh) {
                 this.shorts = [];
-                this.nextCursor = null;
-                this.hasMore = true;
+                this.nextPageToken = null;
             }
 
-            // If category changed, reset
-            if (categorySlug !== this.currentCategory) {
-                this.currentCategory = categorySlug;
+            // If filters changed, reset shorts list
+            if (hashtag !== this.currentHashtag || channelId !== this.currentChannelId) {
+                this.currentHashtag = hashtag;
+                this.currentChannelId = channelId;
                 this.shorts = [];
-                this.nextCursor = null;
-                this.hasMore = true;
+                this.nextPageToken = null;
             }
 
-            if (!this.hasMore && !refresh) return;
             if (this.isLoading) return;
 
             this.isLoading = true;
-            try {
-                const params = {
-                    cursor: this.nextCursor,
-                };
+            this.error = null;
 
-                if (categorySlug) {
-                    params.category = categorySlug;
-                }
+            try {
+                const params = {};
+                if (hashtag) params.hashtag = hashtag;
+                if (channelId) params.channelId = channelId;
+                if (this.nextPageToken) params.page_token = this.nextPageToken;
 
                 const response = await api.get('/shorts', { params });
 
-                const newShorts = response.data.data;
-                const meta = response.data.meta;
+                if (refresh || this.shorts.length === 0) {
+                    this.shorts = response.data.data;
+                } else {
+                    this.shorts = [...this.shorts, ...response.data.data];
+                }
 
-                this.shorts = [...this.shorts, ...newShorts];
-                this.nextCursor = meta.next_cursor;
-                this.hasMore = !!this.nextCursor;
+                this.nextPageToken = response.data.meta.next_page_token;
             } catch (err) {
-                this.error = 'Failed to load shorts';
+                this.error = 'Failed to load shorts from YouTube';
             } finally {
                 this.isLoading = false;
             }
         },
 
-        async toggleFavorite(shortId) {
+        async toggleFavorite(youtubeVideoId) {
             try {
-                const response = await api.post(`/favorites/${shortId}`);
+                const response = await api.post(`/favorites/${youtubeVideoId}`);
 
                 // Update local state
-                const shortIndex = this.shorts.findIndex(s => s.id === shortId);
+                const shortIndex = this.shorts.findIndex(s => s.youtube_video_id === youtubeVideoId);
                 if (shortIndex !== -1) {
                     this.shorts[shortIndex].is_favorited = response.data.is_favorited;
                 }
@@ -68,30 +72,6 @@ export const useShortsStore = defineStore('shorts', {
                 return true;
             } catch (err) {
                 console.error('Favorite toggle error', err);
-                return false;
-            }
-        },
-
-        async createShort(shortData) {
-            this.isLoading = true;
-            try {
-                await api.post('/admin/shorts', shortData);
-                return true;
-            } catch (err) {
-                this.error = err.response?.data?.message || 'Failed to create short';
-                return false;
-            } finally {
-                this.isLoading = false;
-            }
-        },
-
-        async deleteShort(shortId) {
-            try {
-                await api.delete(`/admin/shorts/${shortId}`);
-                this.shorts = this.shorts.filter(s => s.id !== shortId);
-                return true;
-            } catch (err) {
-                console.error('Delete error', err);
                 return false;
             }
         }
