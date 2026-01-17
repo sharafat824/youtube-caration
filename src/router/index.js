@@ -4,6 +4,7 @@ import ShortsFeedView from '../views/ShortsFeedView.vue'
 import HashtagsView from '../views/HashtagsView.vue'
 import FavoritesView from '../views/FavoritesView.vue'
 import LoginView from '../views/LoginView.vue'
+import AuthCallbackView from '../views/AuthCallbackView.vue'
 import AdminLayout from '@/components/layouts/AdminLayout.vue'
 import AdminHashtagsView from '@/views/admin/AdminHashtagsView.vue'
 import AdminChannelsView from '@/views/admin/AdminChannelsView.vue'
@@ -32,6 +33,11 @@ const router = createRouter({
             name: 'login',
             component: LoginView,
             meta: { guestOnly: true }
+        },
+        {
+            path: '/auth-callback',
+            name: 'auth-callback',
+            component: AuthCallbackView
         },
         {
             path: '/admin',

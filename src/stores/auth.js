@@ -59,6 +59,18 @@ export const useAuthStore = defineStore('auth', {
             }
         },
 
+        async loginWithGoogle() {
+            try {
+                const response = await api.get('/auth/google');
+                if (response.data.status === 'success' && response.data.data.url) {
+                    window.location.href = response.data.data.url;
+                }
+            } catch (err) {
+                this.error = 'Failed to initialize Google Login';
+                console.error(err);
+            }
+        },
+
         async logout() {
             // In JWT stateless auth, logout is primarily local
             this.token = null;
