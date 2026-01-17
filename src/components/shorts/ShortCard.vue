@@ -80,6 +80,7 @@ const channelInitial = computed(() => {
                         {{ short.channel_title }}
                     </span>
                     <button 
+                        v-if="authStore.user?.google_id"
                         @click.stop="handleSubscribe" 
                         class="text-[10px] bg-red-600 text-white px-2 py-0.5 rounded-full font-black uppercase tracking-tighter w-fit mt-0.5 hover:bg-red-500 active:scale-95 transition-all shadow-lg"
                     >
@@ -104,7 +105,7 @@ const channelInitial = computed(() => {
         <div class="flex flex-col items-center space-y-5 pb-2">
           
           <!-- Like/React Button -->
-          <button @click.stop="toggleFavorite" class="flex flex-col items-center group">
+          <button v-if="authStore.user?.google_id" @click.stop="toggleFavorite" class="flex flex-col items-center group">
             <div class="w-12 h-12 rounded-full bg-black/30 backdrop-blur-xl border border-white/10 flex items-center justify-center transition-all hover:bg-black/50 active:scale-90 shadow-2xl">
                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 transition-all duration-300" :class="short.is_favorited ? 'text-red-500 fill-red-500 scale-125' : 'text-white'" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
